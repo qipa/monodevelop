@@ -577,5 +577,4 @@ namespace MonoDevelop.Ide.Desktop
 
 		public static bool AccessibilityInUse { get; protected set; }
 	}
-
 }

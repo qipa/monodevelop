@@ -9652,6 +9652,7 @@
     <Compile Include="MonoDevelop.Ide.Templates\NewItemConfiguration.cs" />
     <Compile Include="MonoDevelop.Ide.Templates\ItemTemplatePackageInstaller.cs" />
     <Compile Include="MonoDevelop.Ide.Templates\TemplatePackageReference.cs" />
+    <Compile Include="MonoDevelop.Components.Docking\ToolkitMismatchException.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Makefile.am" />

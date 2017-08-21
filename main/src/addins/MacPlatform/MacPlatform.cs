@@ -54,6 +54,7 @@ using ObjCRuntime;
 using System.Diagnostics;
 using Xwt.Mac;
 using MonoDevelop.Components.Mac;
+using System.Reflection;
 
 namespace MonoDevelop.MacIntegration
 {
