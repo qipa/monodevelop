@@ -72,12 +72,14 @@ namespace MonoDevelop.Core.Setup
 
 		public void RegisterOfficalVisualStudioMarketplace ()
 		{
+			if (Environment.GetEnvironmentVariable ("ENABLE_MARKETPLACE") != "1")//TODO: Remove this once we are happy
+				return;
 			var url = "https://marketplace.visualstudio.com/";
 			if (!Repositories.ContainsRepository (url)) {
 				var rep = Repositories.RegisterRepository (null, url, false, "VisualStudioMarketplace");
 				rep.Name = GettextCatalog.GetString ("Visual Studio Marketplace");
 			}
-			var envVarUrl = Environment.GetEnvironmentVariable ("MARKETPLACE_URL");
+			var envVarUrl = Environment.GetEnvironmentVariable ("CUSTOM_MARKETPLACE_URL");
 			if (!string.IsNullOrWhiteSpace (envVarUrl) && !Repositories.ContainsRepository (envVarUrl)) {
 				var rep = Repositories.RegisterRepository (null, envVarUrl, false, "VisualStudioMarketplace");
 				rep.Name = $"Visual Studio Marketplace({envVarUrl})";
