@@ -70,7 +70,7 @@ namespace MonoDevelop.Core.Setup
 			return "http://addins.monodevelop.com/" + level + "/" + platform + "/" + AddinManager.CurrentAddin.Version + "/main.mrep";
 		}
 
-		public void RegisterOfficalVisualStudioMarketplace ()
+		internal void RegisterOfficialVisualStudioMarketplace ()
 		{
 			if (Environment.GetEnvironmentVariable ("ENABLE_MARKETPLACE") != "1")//TODO: Remove this once we are happy
 				return;
