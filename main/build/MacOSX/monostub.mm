@@ -46,24 +46,19 @@ void *libvsmregistrar;
 #endif
 #endif
 
+#if NOGUI
 static void
-exit_with_message (const char *reason, char *argv0)
+show_alert (NSString *msg, NSString *appName, NSString *mono_download_url)
 {
-	fprintf (stderr, "Failed to launch: %s", reason);
-
-	NSString *appName = nil;
-	NSDictionary *plist = [[NSBundle mainBundle] infoDictionary];
-	if (plist) {
-		appName = (NSString *) [plist objectForKey:(NSString *)kCFBundleNameKey];
-	}
-	if (!appName) {
-		appName = [[NSString stringWithUTF8String: argv0] lastPathComponent];
-	}
-
+	fprintf(stderr, "%s\n", [msg UTF8String]);
+	fprintf(stderr, "%s\n", [mono_download_url UTF8String]);
+}
+#else
+static void
+show_alert (NSString *msg, NSString *appName, NSString *mono_download_url)
+{
 	NSAlert *alert = [[NSAlert alloc] init];
 	[alert setMessageText:[NSString stringWithFormat:@"Could not launch %@", appName]];
-	NSString *fmt = @"%s\n\nPlease download and install the latest version of Mono.";
-	NSString *msg = [NSString stringWithFormat:fmt, reason];
 	[alert setInformativeText:msg];
 	[alert addButtonWithTitle:@"Download Mono Framework"];
 	[alert addButtonWithTitle:@"Cancel"];
@@ -76,9 +71,28 @@ exit_with_message (const char *reason, char *argv0)
 		LSOpenCFURLRef (url, NULL);
 		CFRelease (url);
 	}
+}
+#endif
+
+static void
+exit_with_message (const char *reason, char *argv0)
+{
+	NSString *appName = nil;
+	NSDictionary *plist = [[NSBundle mainBundle] infoDictionary];
+	if (plist) {
+		appName = (NSString *) [plist objectForKey:(NSString *)kCFBundleNameKey];
+	}
+	if (!appName) {
+		appName = [[NSString stringWithUTF8String: argv0] lastPathComponent];
+	}
+
+	NSString *fmt = @"%s\n\nPlease download and install the latest version of Mono.";
+	NSString *msg = [NSString stringWithFormat:fmt, reason];
+	NSString *mono_download_url = @"https://go.microsoft.com/fwlink/?linkid=835346";
+
+	show_alert(msg, appName, mono_download_url);
 	exit (1);
 }
-
 
 typedef struct _ListNode {
 	struct _ListNode *next;
@@ -293,16 +307,6 @@ run_md_bundle_if_needed(NSString *appDir, int argc, char **argv)
     }
 }
 
-static void
-init_registrar()
-{
-#if XM_REGISTRAR
-    xamarin_create_classes_Xamarin_Mac ();
-#elif STATIC_REGISTRAR
-    xamarin_create_classes ();
-#endif
-}
-
 int main (int argc, char **argv)
 {
 	//clock_t start = clock();
@@ -323,7 +327,9 @@ int main (int argc, char **argv)
 	run_md_bundle_if_needed(appDir, argc, argv);
 
 	// can be overridden with plist string MonoMinVersion
-	NSString *req_mono_version = @"5.2.0.171";
+	NSString *req_mono_version = @"5.10.0.171";
+	NSString *req_mono_version_stable = @"5.8.0.130"; // remove this when not needed anymore
+
 	// can be overridden with either plist bool MonoUseSGen or MONODEVELOP_USE_SGEN env
 	bool use_sgen = YES;
 	bool need64Bit = false;
@@ -403,18 +409,19 @@ int main (int argc, char **argv)
 	}
 
 #if STATIC_REGISTRAR
-	libvsmregistrar = dlopen ("@loader_path/libvsmregistrar.dylib", RTLD_LAZY);
-	if (!libvsmregistrar) {
-		libvsmregistrar = dlopen ("@loader_path/../Resources/lib/monodevelop/bin/libvsmregistrar.dylib", RTLD_LAZY);
+	char *registrar_toggle = getenv("MD_DISABLE_STATIC_REGISTRAR");
+	if (!registrar_toggle) {
+		libvsmregistrar = dlopen ("@loader_path/libvsmregistrar.dylib", RTLD_LAZY);
 		if (!libvsmregistrar) {
-			fprintf (stderr, "Failed to load libvsmregistrar.dylib: %s\n", dlerror ());
-			NSString *msg = @"This application requires Xamarin.Mac static registrar side-by-side.";
-			exit_with_message ((char *)[msg UTF8String], argv[0]);
+			libvsmregistrar = dlopen ("@loader_path/../Resources/lib/monodevelop/bin/libvsmregistrar.dylib", RTLD_LAZY);
 		}
+		if (libvsmregistrar)
+			xamarin_create_classes ();
 	}
+#else
+	xamarin_create_classes_Xamarin_Mac ();
 #endif
 
-	init_registrar();
 #endif
 
 	try_load_gobject_tracker (libmono, argv [0]);
@@ -438,9 +445,17 @@ int main (int argc, char **argv)
 	}
 
 	char *mono_version = _mono_get_runtime_build_info ();
+
+	// There is a JIT fix that is in mono 5.8.0.130 and 5.10.0.124
+	// Check mono > 5.10 first, then check > 5.8 and < 5.9. Otherwise it falls
+	// into the broken range of [5.9.0 5.10.0.123]
 	if (!check_mono_version (mono_version, [req_mono_version UTF8String])) {
-		NSString *msg = [NSString stringWithFormat:@"This application requires a newer version (%s+) of the Mono framework.", [req_mono_version UTF8String]];
-		exit_with_message ((char *)[msg UTF8String], argv[0]);
+		if (check_mono_version (mono_version, [req_mono_version_stable UTF8String])) {
+			if (check_mono_version (mono_version, "5.9.0")) {
+				NSString *msg = [NSString stringWithFormat:@"This application requires a newer version (%s+) of the Mono framework.", [req_mono_version UTF8String]];
+				exit_with_message ((char *)[msg UTF8String], argv[0]);
+			}
+		}
 	}
 
 	extra_argv = get_mono_env_options (&extra_argc);
