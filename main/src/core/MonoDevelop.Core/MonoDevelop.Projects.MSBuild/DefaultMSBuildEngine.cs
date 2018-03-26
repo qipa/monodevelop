@@ -1042,12 +1042,12 @@ namespace MonoDevelop.Projects.MSBuild
 			return CreateEvaluatedItem (context, project, project.Project, item, context.EvaluateString (item.Include));
 		}
 
-		IEnumerable<ProjectInfo> GetImportedProjects (ProjectInfo project, MSBuildImport import)
+		IReadOnlyList<ProjectInfo> GetImportedProjects (ProjectInfo project, MSBuildImport import)
 		{
 			List<ProjectInfo> prefProjects;
 			if (project.ImportedProjects.TryGetValue (import, out prefProjects))
 				return prefProjects;
-			return Enumerable.Empty<ProjectInfo> ();
+			return Array.Empty<ProjectInfo> ();
 		}
 
 		void AddImportedProject (ProjectInfo project, MSBuildImport import, ProjectInfo imported)
@@ -1071,7 +1071,9 @@ namespace MonoDevelop.Projects.MSBuild
 			if (evalItems) {
 				// Properties have already been evaluated
 				// Don't evaluate properties, only items and other elements
-				foreach (var p in GetImportedProjects (project, import)) {
+				var importedProjects = GetImportedProjects (project, import);
+				for (int i = 0; i < importedProjects.Count; ++i) {
+					var p = importedProjects [i];
 					
 					EvaluateProject (p, new MSBuildEvaluationContext (context), true);
 
@@ -1115,9 +1117,20 @@ namespace MonoDevelop.Projects.MSBuild
 			// In that case, look in fallback search paths
 
 			if (keepSearching) {
-				foreach (var prop in context.GetProjectImportSearchPaths ()) {
-					if (import.Project.IndexOf ("$(" + prop.Property + ")", StringComparison.OrdinalIgnoreCase) == -1)
+				var importSearchPaths = context.GetProjectImportSearchPaths ();
+				for (int i = 0; i < importSearchPaths.Count; ++i) {
+					var prop = importSearchPaths [i];
+
+					int propertyStart = import.Project.IndexOf ("$(", StringComparison.Ordinal);
+					if (propertyStart == -1)
 						continue;
+					int propertyNameStart = import.Project.IndexOf (prop.Property, propertyStart, StringComparison.OrdinalIgnoreCase);
+					if (propertyNameStart == -1)
+						continue;
+					int propertyEnd = import.Project.IndexOf (')', propertyNameStart + prop.Property.Length);
+					if (propertyEnd == -1)
+						continue;
+
 					files = GetImportFiles (project, context, import, prop.Property, prop.Path, out resolvedSdksPath, out keepSearching);
 					if (files != null) {
 						foreach (var f in files)
